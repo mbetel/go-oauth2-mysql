@@ -1,6 +1,7 @@
 package mq
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -65,6 +66,7 @@ func NewTokenStore(db *sqlx.DB, options ...TokenStoreOption) (*TokenStore, error
 	}
 
 	return store, err
+
 }
 
 // Close closes the store
@@ -92,13 +94,16 @@ CREATE TABLE IF NOT EXISTS %[1]s (
 	refresh    TEXT        NOT NULL,
 	data       JSONB       NOT NULL,
 	CONSTRAINT %[1]s_pkey PRIMARY KEY (id)
-);
-CREATE INDEX IF NOT EXISTS idx_%[1]s_expires_at ON %[1]s (expires_at);
-CREATE INDEX IF NOT EXISTS idx_%[1]s_code ON %[1]s (code);
-CREATE INDEX IF NOT EXISTS idx_%[1]s_access ON %[1]s (access);
-CREATE INDEX IF NOT EXISTS idx_%[1]s_refresh ON %[1]s (refresh);
-`, s.tableName)
+)`, s.tableName)
 	_, err := s.db.Exec(q)
+	q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_expires_at ON %[1]s (expires_at)", s.tableName)
+	_, err = s.db.Exec(q)
+	q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_code ON %[1]s (code)", s.tableName)
+	_, err = s.db.Exec(q)
+	q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_access ON %[1]s (access)", s.tableName)
+	_, err = s.db.Exec(q)
+	q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_refresh ON %[1]s (refresh)", s.tableName)
+	_, err = s.db.Exec(q)
 	return err
 }
 
@@ -112,7 +117,7 @@ func (s *TokenStore) clean() {
 }
 
 // Create creates and stores the new token information
-func (s *TokenStore) Create(info oauth2.TokenInfo) error {
+func (s *TokenStore) Create(ctx context.Context, info oauth2.TokenInfo) error {
 	buf, err := json.Marshal(info)
 	if err != nil {
 		return err
@@ -148,7 +153,7 @@ func (s *TokenStore) Create(info oauth2.TokenInfo) error {
 }
 
 // RemoveByCode deletes the authorization code
-func (s *TokenStore) RemoveByCode(code string) error {
+func (s *TokenStore) RemoveByCode(ctx context.Context, code string) error {
 	_, err := s.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE code = ?", s.tableName), code)
 	if err == sql.ErrNoRows {
 		return nil
@@ -157,7 +162,7 @@ func (s *TokenStore) RemoveByCode(code string) error {
 }
 
 // RemoveByAccess uses the access token to delete the token information
-func (s *TokenStore) RemoveByAccess(access string) error {
+func (s *TokenStore) RemoveByAccess(ctx context.Context, access string) error {
 	_, err := s.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE access = ?", s.tableName), access)
 	if err == sql.ErrNoRows {
 		return nil
@@ -166,7 +171,7 @@ func (s *TokenStore) RemoveByAccess(access string) error {
 }
 
 // RemoveByRefresh uses the refresh token to delete the token information
-func (s *TokenStore) RemoveByRefresh(refresh string) error {
+func (s *TokenStore) RemoveByRefresh(ctx context.Context, refresh string) error {
 	_, err := s.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE refresh = ?", s.tableName), refresh)
 	if err == sql.ErrNoRows {
 		return nil
@@ -181,7 +186,7 @@ func (s *TokenStore) toTokenInfo(data []byte) (oauth2.TokenInfo, error) {
 }
 
 // GetByCode uses the authorization code for token information data
-func (s *TokenStore) GetByCode(code string) (oauth2.TokenInfo, error) {
+func (s *TokenStore) GetByCode(ctx context.Context, code string) (oauth2.TokenInfo, error) {
 	if code == "" {
 		return nil, nil
 	}
@@ -195,7 +200,7 @@ func (s *TokenStore) GetByCode(code string) (oauth2.TokenInfo, error) {
 }
 
 // GetByAccess uses the access token for token information data
-func (s *TokenStore) GetByAccess(access string) (oauth2.TokenInfo, error) {
+func (s *TokenStore) GetByAccess(ctx context.Context, access string) (oauth2.TokenInfo, error) {
 	if access == "" {
 		return nil, nil
 	}
@@ -209,7 +214,7 @@ func (s *TokenStore) GetByAccess(access string) (oauth2.TokenInfo, error) {
 }
 
 // GetByRefresh uses the refresh token for token information data
-func (s *TokenStore) GetByRefresh(refresh string) (oauth2.TokenInfo, error) {
+func (s *TokenStore) GetByRefresh(ctx context.Context, refresh string) (oauth2.TokenInfo, error) {
 	if refresh == "" {
 		return nil, nil
 	}
