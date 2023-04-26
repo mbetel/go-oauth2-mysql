@@ -12,7 +12,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// ClientStore Mysql client store
+// ClientStore Mariadb client store
 type ClientStore struct {
 	db                *sqlx.DB
 	tableName         string
@@ -53,12 +53,11 @@ func NewClientStore(db *sqlx.DB, options ...ClientStoreOption) (*ClientStore, er
 }
 
 func (s *ClientStore) initTable() error {
-	_, err := s.db.Exec(fmt.Sprintf(`
-CREATE TABLE IF NOT EXISTS %[1]s (
-	id     Varchar(255)  NOT NULL Primary Key,
-	secret Varchar(255)  NOT NULL,
-	domain Varchar(255)  NOT NULL,
-	data   Text NOT NULL);
+	_, err := s.db.Exec(fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %[1]s (
+id     Varchar(255)  NOT NULL Primary Key,
+secret Varchar(255)  NOT NULL,
+domain Varchar(255)  NOT NULL,
+data   Text NOT NULL);
 `, s.tableName))
 	return err
 }

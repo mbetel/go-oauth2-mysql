@@ -14,16 +14,15 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// TokenStore Mysql token store
+// TokenStore Mariadb token store
 type TokenStore struct {
 	db        *sqlx.DB
 	tableName string
 	logger    Logger
 
-	gcDisabled bool
-	gcInterval time.Duration
-	ticker     *time.Ticker
-
+	gcDisabled        bool
+	gcInterval        time.Duration
+	ticker            *time.Ticker
 	initTableDisabled bool
 }
 
@@ -94,15 +93,18 @@ CREATE TABLE IF NOT EXISTS %[1]s (
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	expires_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 )`, s.tableName)
+
 	_, err := s.db.Exec(q)
-	q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_expires_at ON %[1]s (expires_at)", s.tableName)
-	_, err = s.db.Exec(q)
-	q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_code ON %[1]s (code)", s.tableName)
-	_, err = s.db.Exec(q)
-	q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_access ON %[1]s (access)", s.tableName)
-	_, err = s.db.Exec(q)
-	q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_refresh ON %[1]s (refresh)", s.tableName)
-	_, err = s.db.Exec(q)
+	/*
+		q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_expires_at ON %[1]s (expires_at)", s.tableName)
+		_, err = s.db.Exec(q)
+		q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_code ON %[1]s (code)", s.tableName)
+		_, err = s.db.Exec(q)
+		q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_access ON %[1]s (access)", s.tableName)
+		_, err = s.db.Exec(q)
+		q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_refresh ON %[1]s (refresh)", s.tableName)
+		_, err = s.db.Exec(q)
+	*/
 	return err
 }
 
