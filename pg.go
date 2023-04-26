@@ -1,6 +1,6 @@
-package pg
+package mq
 
-// Logger is the PostgreSQL store logger interface
+// Logger is the Mysql store logger interface
 type Logger interface {
 	Printf(format string, v ...interface{})
 }

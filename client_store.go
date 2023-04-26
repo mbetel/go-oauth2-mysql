@@ -1,4 +1,4 @@
-package pg
+package mq
 
 import (
 	"context"
@@ -9,16 +9,14 @@ import (
 
 	"github.com/go-oauth2/oauth2/v4"
 	"github.com/go-oauth2/oauth2/v4/models"
-
-	pgAdapter "github.com/vgarvardt/go-pg-adapter"
+	"github.com/jmoiron/sqlx"
 )
 
-// ClientStore PostgreSQL client store
+// ClientStore Mysql client store
 type ClientStore struct {
-	adapter   pgAdapter.Adapter
-	tableName string
-	logger    Logger
-
+	db                *sqlx.DB
+	tableName         string
+	logger            Logger
 	initTableDisabled bool
 }
 
@@ -31,11 +29,11 @@ type ClientStoreItem struct {
 }
 
 // NewClientStore creates PostgreSQL store instance
-func NewClientStore(adapter pgAdapter.Adapter, options ...ClientStoreOption) (*ClientStore, error) {
+func NewClientStore(db *sqlx.DB, options ...ClientStoreOption) (*ClientStore, error) {
 	store := &ClientStore{
-		adapter:   adapter,
+		db:        db,
 		tableName: "oauth2_clients",
-		logger:    log.New(os.Stderr, "[OAUTH2-PG-ERROR]", log.LstdFlags),
+		logger:    log.New(os.Stderr, "[OAUTH2-MYSQL-ERROR]", log.LstdFlags),
 	}
 
 	for _, o := range options {
@@ -55,7 +53,7 @@ func NewClientStore(adapter pgAdapter.Adapter, options ...ClientStoreOption) (*C
 }
 
 func (s *ClientStore) initTable() error {
-	return s.adapter.Exec(context.Background(), fmt.Sprintf(`
+	_, err := s.db.Exec(fmt.Sprintf(`
 CREATE TABLE IF NOT EXISTS %[1]s (
 	id     TEXT  NOT NULL,
 	secret TEXT  NOT NULL,
@@ -64,6 +62,8 @@ CREATE TABLE IF NOT EXISTS %[1]s (
 	CONSTRAINT %[1]s_pkey PRIMARY KEY (id)
 );
 `, s.tableName))
+
+	return err
 }
 
 func (s *ClientStore) toClientInfo(data []byte) (oauth2.ClientInfo, error) {
@@ -79,26 +79,26 @@ func (s *ClientStore) GetByID(ctx context.Context, id string) (oauth2.ClientInfo
 	}
 
 	var item ClientStoreItem
-	if err := s.adapter.SelectOne(ctx, &item, fmt.Sprintf("SELECT * FROM %s WHERE id = $1", s.tableName), id); err != nil {
+	q := fmt.Sprintf("SELECT * FROM %s WHERE id = ?", s.tableName)
+	if err := s.db.Get(&item, q, id); err != nil {
 		return nil, err
 	}
-
 	return s.toClientInfo(item.Data)
 }
 
-// Create creates and stores the new client information
+// Create creates and stores the n	ew client information
 func (s *ClientStore) Create(info oauth2.ClientInfo) error {
 	data, err := json.Marshal(info)
 	if err != nil {
 		return err
 	}
-
-	return s.adapter.Exec(
-		context.Background(),
-		fmt.Sprintf("INSERT INTO %s (id, secret, domain, data) VALUES ($1, $2, $3, $4)", s.tableName),
+	q := fmt.Sprintf("INSERT INTO %s (id, secret, domain, data) VALUES (?, ?, ?, ?)", s.tableName)
+	_, err = s.db.Exec(
+		q,
 		info.GetID(),
 		info.GetSecret(),
 		info.GetDomain(),
 		data,
 	)
+	return err
 }

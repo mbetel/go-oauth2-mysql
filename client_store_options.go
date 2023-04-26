@@ -1,4 +1,4 @@
-package pg
+package mq
 
 // ClientStoreOption is the configuration options type for client store
 type ClientStoreOption func(s *ClientStore)

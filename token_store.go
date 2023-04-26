@@ -1,7 +1,8 @@
-package pg
+package mq
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,13 +11,12 @@ import (
 
 	"github.com/go-oauth2/oauth2/v4"
 	"github.com/go-oauth2/oauth2/v4/models"
-
-	pgAdapter "github.com/vgarvardt/go-pg-adapter"
+	"github.com/jmoiron/sqlx"
 )
 
-// TokenStore PostgreSQL token store
+// TokenStore Mysql token store
 type TokenStore struct {
-	adapter   pgAdapter.Adapter
+	db        *sqlx.DB
 	tableName string
 	logger    Logger
 
@@ -38,10 +38,10 @@ type TokenStoreItem struct {
 	Data      []byte    `db:"data"`
 }
 
-// NewTokenStore creates PostgreSQL store instance
-func NewTokenStore(adapter pgAdapter.Adapter, options ...TokenStoreOption) (*TokenStore, error) {
+// NewTokenStore creates Mysql store instance
+func NewTokenStore(db *sqlx.DB, options ...TokenStoreOption) (*TokenStore, error) {
 	store := &TokenStore{
-		adapter:    adapter,
+		db:         db,
 		tableName:  "oauth2_tokens",
 		logger:     log.New(os.Stderr, "[OAUTH2-PG-ERROR]", log.LstdFlags),
 		gcInterval: 10 * time.Minute,
@@ -83,7 +83,7 @@ func (s *TokenStore) gc() {
 }
 
 func (s *TokenStore) initTable() error {
-	return s.adapter.Exec(context.Background(), fmt.Sprintf(`
+	q := fmt.Sprintf(`
 CREATE TABLE IF NOT EXISTS %[1]s (
 	id         BIGSERIAL   NOT NULL,
 	created_at TIMESTAMPTZ NOT NULL,
@@ -94,17 +94,19 @@ CREATE TABLE IF NOT EXISTS %[1]s (
 	data       JSONB       NOT NULL,
 	CONSTRAINT %[1]s_pkey PRIMARY KEY (id)
 );
-
 CREATE INDEX IF NOT EXISTS idx_%[1]s_expires_at ON %[1]s (expires_at);
 CREATE INDEX IF NOT EXISTS idx_%[1]s_code ON %[1]s (code);
 CREATE INDEX IF NOT EXISTS idx_%[1]s_access ON %[1]s (access);
 CREATE INDEX IF NOT EXISTS idx_%[1]s_refresh ON %[1]s (refresh);
-`, s.tableName))
+`, s.tableName)
+	_, err := s.db.Exec(q)
+	return err
 }
 
 func (s *TokenStore) clean() {
 	now := time.Now()
-	err := s.adapter.Exec(context.Background(), fmt.Sprintf("DELETE FROM %s WHERE expires_at <= $1", s.tableName), now)
+	q := fmt.Sprintf("DELETE FROM %s WHERE expires_at <= ?", s.tableName)
+	_, err := s.db.Exec(q, now)
 	if err != nil {
 		s.logger.Printf("Error while cleaning out outdated entities: %+v", err)
 	}
@@ -134,10 +136,8 @@ func (s *TokenStore) Create(ctx context.Context, info oauth2.TokenInfo) error {
 			item.ExpiresAt = info.GetRefreshCreateAt().Add(info.GetRefreshExpiresIn())
 		}
 	}
-
-	return s.adapter.Exec(
-		ctx,
-		fmt.Sprintf("INSERT INTO %s (created_at, expires_at, code, access, refresh, data) VALUES ($1, $2, $3, $4, $5, $6)", s.tableName),
+	q := fmt.Sprintf("INSERT INTO %s (created_at, expires_at, code, access, refresh, data) VALUES (?, ?, ?, ?, ?, ?)", s.tableName)
+	_, err = s.db.Exec(q,
 		item.CreatedAt,
 		item.ExpiresAt,
 		item.Code,
@@ -145,30 +145,31 @@ func (s *TokenStore) Create(ctx context.Context, info oauth2.TokenInfo) error {
 		item.Refresh,
 		item.Data,
 	)
+	return err
 }
 
 // RemoveByCode deletes the authorization code
-func (s *TokenStore) RemoveByCode(ctx context.Context, code string) error {
-	err := s.adapter.Exec(ctx, fmt.Sprintf("DELETE FROM %s WHERE code = $1", s.tableName), code)
-	if err == pgAdapter.ErrNoRows {
+func (s *TokenStore) RemoveByCode(code string) error {
+	_, err := s.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE code = ?", s.tableName), code)
+	if err == sql.ErrNoRows {
 		return nil
 	}
 	return err
 }
 
 // RemoveByAccess uses the access token to delete the token information
-func (s *TokenStore) RemoveByAccess(ctx context.Context, access string) error {
-	err := s.adapter.Exec(ctx, fmt.Sprintf("DELETE FROM %s WHERE access = $1", s.tableName), access)
-	if err == pgAdapter.ErrNoRows {
+func (s *TokenStore) RemoveByAccess(access string) error {
+	_, err := s.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE access = ?", s.tableName), access)
+	if err == sql.ErrNoRows {
 		return nil
 	}
 	return err
 }
 
 // RemoveByRefresh uses the refresh token to delete the token information
-func (s *TokenStore) RemoveByRefresh(ctx context.Context, refresh string) error {
-	err := s.adapter.Exec(ctx, fmt.Sprintf("DELETE FROM %s WHERE refresh = $1", s.tableName), refresh)
-	if err == pgAdapter.ErrNoRows {
+func (s *TokenStore) RemoveByRefresh(refresh string) error {
+	_, err := s.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE refresh = ?", s.tableName), refresh)
+	if err == sql.ErrNoRows {
 		return nil
 	}
 	return err
@@ -181,13 +182,13 @@ func (s *TokenStore) toTokenInfo(data []byte) (oauth2.TokenInfo, error) {
 }
 
 // GetByCode uses the authorization code for token information data
-func (s *TokenStore) GetByCode(ctx context.Context, code string) (oauth2.TokenInfo, error) {
+func (s *TokenStore) GetByCode(code string) (oauth2.TokenInfo, error) {
 	if code == "" {
 		return nil, nil
 	}
 
 	var item TokenStoreItem
-	if err := s.adapter.SelectOne(ctx, &item, fmt.Sprintf("SELECT * FROM %s WHERE code = $1", s.tableName), code); err != nil {
+	if err := s.db.Get(&item, fmt.Sprintf("SELECT * FROM %s WHERE code = ?", s.tableName), code); err != nil {
 		return nil, err
 	}
 
@@ -195,13 +196,13 @@ func (s *TokenStore) GetByCode(ctx context.Context, code string) (oauth2.TokenIn
 }
 
 // GetByAccess uses the access token for token information data
-func (s *TokenStore) GetByAccess(ctx context.Context, access string) (oauth2.TokenInfo, error) {
+func (s *TokenStore) GetByAccess(access string) (oauth2.TokenInfo, error) {
 	if access == "" {
 		return nil, nil
 	}
 
 	var item TokenStoreItem
-	if err := s.adapter.SelectOne(ctx, &item, fmt.Sprintf("SELECT * FROM %s WHERE access = $1", s.tableName), access); err != nil {
+	if err := s.db.Get(&item, fmt.Sprintf("SELECT * FROM %s WHERE access = ?", s.tableName), access); err != nil {
 		return nil, err
 	}
 
@@ -209,13 +210,13 @@ func (s *TokenStore) GetByAccess(ctx context.Context, access string) (oauth2.Tok
 }
 
 // GetByRefresh uses the refresh token for token information data
-func (s *TokenStore) GetByRefresh(ctx context.Context, refresh string) (oauth2.TokenInfo, error) {
+func (s *TokenStore) GetByRefresh(refresh string) (oauth2.TokenInfo, error) {
 	if refresh == "" {
 		return nil, nil
 	}
 
 	var item TokenStoreItem
-	if err := s.adapter.SelectOne(ctx, &item, fmt.Sprintf("SELECT * FROM %s WHERE refresh = $1", s.tableName), refresh); err != nil {
+	if err := s.db.Get(&item, fmt.Sprintf("SELECT * FROM %s WHERE refresh = ?", s.tableName), refresh); err != nil {
 		return nil, err
 	}
 
