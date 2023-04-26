@@ -1,4 +1,4 @@
-# PostgreSQL Storage for [OAuth 2.0](https://github.com/go-oauth2/oauth2)
+# Mysql Storage for [OAuth 2.0](https://github.com/go-oauth2/oauth2)
 
 [![GoDoc](https://godoc.org/github.com/vgarvardt/go-oauth2-pg?status.svg)](https://godoc.org/github.com/vgarvardt/go-oauth2-pg)
 [![Coverage Status](https://codecov.io/gh/vgarvardt/go-oauth2-pg/branch/master/graph/badge.svg)](https://codecov.io/gh/vgarvardt/go-oauth2-pg)
