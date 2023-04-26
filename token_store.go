@@ -93,10 +93,6 @@ CREATE TABLE IF NOT EXISTS %[1]s (
 	data TEXT NOT NULL,
 	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 	expires_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	KEY access_k(access),
-	KEY refresh_k (refresh),
-	KEY expired_at_k (expired_at),
-	KEY code_k (code)
 )`, s.tableName)
 	_, err := s.db.Exec(q)
 	q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_expires_at ON %[1]s (expires_at)", s.tableName)

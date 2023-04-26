@@ -28,7 +28,7 @@ type ClientStoreItem struct {
 	Data   []byte `db:"data"`
 }
 
-// NewClientStore creates PostgreSQL store instance
+// NewClientStore creates Mariadb store instance
 func NewClientStore(db *sqlx.DB, options ...ClientStoreOption) (*ClientStore, error) {
 	store := &ClientStore{
 		db:        db,
