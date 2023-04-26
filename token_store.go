@@ -86,14 +86,17 @@ func (s *TokenStore) gc() {
 func (s *TokenStore) initTable() error {
 	q := fmt.Sprintf(`
 CREATE TABLE IF NOT EXISTS %[1]s (
-	id         BIGSERIAL   NOT NULL,
-	created_at TIMESTAMPTZ NOT NULL,
-	expires_at TIMESTAMPTZ NOT NULL,
-	code       TEXT        NOT NULL,
-	access     TEXT        NOT NULL,
-	refresh    TEXT        NOT NULL,
-	data       JSONB       NOT NULL,
-	CONSTRAINT %[1]s_pkey PRIMARY KEY (id)
+	id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	code VARCHAR(255),
+	access VARCHAR(255) NOT NULL,
+	refresh VARCHAR(255) NOT NULL,
+	data TEXT NOT NULL,
+	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	expires_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	KEY access_k(access),
+	KEY refresh_k (refresh),
+	KEY expired_at_k (expired_at),
+	KEY code_k (code)
 )`, s.tableName)
 	_, err := s.db.Exec(q)
 	q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_expires_at ON %[1]s (expires_at)", s.tableName)

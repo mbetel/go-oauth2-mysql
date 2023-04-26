@@ -55,14 +55,11 @@ func NewClientStore(db *sqlx.DB, options ...ClientStoreOption) (*ClientStore, er
 func (s *ClientStore) initTable() error {
 	_, err := s.db.Exec(fmt.Sprintf(`
 CREATE TABLE IF NOT EXISTS %[1]s (
-	id     TEXT  NOT NULL,
-	secret TEXT  NOT NULL,
-	domain TEXT  NOT NULL,
-	data   JSONB NOT NULL,
-	CONSTRAINT %[1]s_pkey PRIMARY KEY (id)
-);
+	id     Varchar(255)  NOT NULL Primary Key,
+	secret Varchar(255)  NOT NULL,
+	domain Varchar(255)  NOT NULL,
+	data   Text NOT NULL);
 `, s.tableName))
-
 	return err
 }
 
@@ -98,7 +95,7 @@ func (s *ClientStore) Create(info oauth2.ClientInfo) error {
 		info.GetID(),
 		info.GetSecret(),
 		info.GetDomain(),
-		data,
+		string(data),
 	)
 	return err
 }
