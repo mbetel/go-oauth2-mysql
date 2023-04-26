@@ -1,7 +1,6 @@
 package mq
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -113,7 +112,7 @@ func (s *TokenStore) clean() {
 }
 
 // Create creates and stores the new token information
-func (s *TokenStore) Create(ctx context.Context, info oauth2.TokenInfo) error {
+func (s *TokenStore) Create(info oauth2.TokenInfo) error {
 	buf, err := json.Marshal(info)
 	if err != nil {
 		return err
