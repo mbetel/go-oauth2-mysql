@@ -57,8 +57,7 @@ func (s *ClientStore) initTable() error {
 id     Varchar(255)  NOT NULL Primary Key,
 secret Varchar(255)  NOT NULL,
 domain Varchar(255)  NOT NULL,
-data   Text NOT NULL);
-`, s.tableName))
+data   Text NOT NULL)`, s.tableName))
 	return err
 }
 
