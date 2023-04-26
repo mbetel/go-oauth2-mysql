@@ -84,16 +84,14 @@ func (s *TokenStore) gc() {
 
 func (s *TokenStore) initTable() error {
 	q := fmt.Sprintf(`
-CREATE TABLE IF NOT EXISTS %[1]s (
-	id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-	code VARCHAR(255),
-	access VARCHAR(255) NOT NULL,
-	refresh VARCHAR(255) NOT NULL,
-	data TEXT NOT NULL,
-	created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-	expires_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)`, s.tableName)
-
+CREATE TABLE IF NOT EXISTS %s (
+id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+code VARCHAR(255),
+access VARCHAR(255) NOT NULL,
+refresh VARCHAR(255) NOT NULL,
+data TEXT NOT NULL,
+created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+expires_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`, s.tableName)
 	_, err := s.db.Exec(q)
 	/*
 		q = fmt.Sprintf("CREATE INDEX IF NOT EXISTS idx_%s_expires_at ON %[1]s (expires_at)", s.tableName)
@@ -110,7 +108,7 @@ CREATE TABLE IF NOT EXISTS %[1]s (
 
 func (s *TokenStore) clean() {
 	now := time.Now()
-	q := fmt.Sprintf("DELETE FROM %s WHERE expires_at <= ?", s.tableName)
+	q := "DELETE FROM " + s.tableName + " WHERE expires_at <= ?"
 	_, err := s.db.Exec(q, now)
 	if err != nil {
 		s.logger.Printf("Error while cleaning out outdated entities: %+v", err)
